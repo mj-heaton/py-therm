@@ -28,12 +28,11 @@ def calculate_vapor_pressure(temperature_celsius: float, relative_humidity: floa
     return vapor_pressure
 
 
-def calculate_dew_point(temperature_celsius: float, vapor_pressure: float) -> float:
+def calculate_dew_point(vapor_pressure: float) -> float:
     """
     Calculate the dew point temperature given the temperature and vapor pressure.
 
     Parameters:
-    temperature_celsius (float): Temperature in degrees Celsius.
     vapor_pressure (float): Actual vapor pressure in hPa (hectopascals).
 
     Returns:
@@ -42,9 +41,6 @@ def calculate_dew_point(temperature_celsius: float, vapor_pressure: float) -> fl
     # Constants for the Magnus formula
     a = 17.27
     b = 237.7  # in degrees Celsius
-
-    # Calculate saturation vapor pressure at the given temperature
-    saturation_vapor_pressure = 6.1078 * math.exp((a * temperature_celsius) / (b + temperature_celsius))
 
     # Calculate the intermediate value for dew point calculation
     alpha = math.log(vapor_pressure / 6.1078)
@@ -59,7 +55,7 @@ def calculate_dew_point(temperature_celsius: float, vapor_pressure: float) -> fl
 class Material:
     name: str
     conductivity: float
-    vapour_resistivity: float
+    vapor_resistivity: float
 
 
 @dataclass
@@ -86,7 +82,7 @@ class Layer:
         Calculate the vapour resistance of the layer in m²sPa/W.
         Converts thickness from mm to meters.
         """
-        return (self.thickness / 1000) * self.material.vapour_resistivity
+        return (self.thickness / 1000) * self.material.vapor_resistivity
 
 
 @dataclass
@@ -133,20 +129,20 @@ class Wall:
 
 
 # Example layers materials
-brick = Material(name="Brickwork", conductivity=0.7, vapour_resistivity=60)
-lime_plaster = Material(name="Lime Plaster", conductivity=0.6, vapour_resistivity=5)
-rockwool = Material(name="Rockwool", conductivity=0.032, vapour_resistivity=0.5)
-wood_wool = Material(name="Wood Wool", conductivity=0.038, vapour_resistivity=5)
-pir_insulation = Material(name="PIR Insulation", conductivity=0.022, vapour_resistivity=100)
-aluminium_foil = Material(name="Aluminium Foil", conductivity=5, vapour_resistivity=100000)
+brick = Material(name="Brickwork", conductivity=0.7, vapor_resistivity=60)
+lime_plaster = Material(name="Lime Plaster", conductivity=0.6, vapor_resistivity=5)
+rockwool = Material(name="Rockwool", conductivity=0.032, vapor_resistivity=0.5)
+wood_wool = Material(name="Wood Wool", conductivity=0.038, vapor_resistivity=5)
+pir_insulation = Material(name="PIR Insulation", conductivity=0.022, vapor_resistivity=100)
+aluminium_foil = Material(name="Aluminium Foil", conductivity=5, vapor_resistivity=100000)
 
-internal_surface = Layer(name="Internal Surface", thickness=0.01, material=Material(name="Internal Surface", conductivity=(0.01 / (1000 * 0.13)), vapour_resistivity=0))
+internal_surface = Layer(name="Internal Surface", thickness=0.01, material=Material(name="Internal Surface", conductivity=(0.01 / (1000 * 0.13)), vapor_resistivity=0))
 internal_skim = Layer(name="Internal Lime Plaster Skim", thickness=0, material=lime_plaster)
 insulation_board = Layer(name="Insulation Wood Board", thickness=50, material=wood_wool)
 internal_render = Layer(name="Internal Lime Plaster Render", thickness=5, material=lime_plaster)
 brickwork = Layer(name="Brickwork",  thickness=220, material=brick)
 vapor_membrane = Layer(name="Vapor Membrane", thickness=0.4, material=aluminium_foil)
-external_surface = Layer(name="External Surface", thickness=0.01, material=Material(name="External Surface", conductivity=(0.01 / (1000 * 0.04)), vapour_resistivity=0))
+external_surface = Layer(name="External Surface", thickness=0.01, material=Material(name="External Surface", conductivity=(0.01 / (1000 * 0.04)), vapor_resistivity=0))
 
 # Creating a wall with these layers
 wall = Wall(layers=[internal_surface, internal_skim, insulation_board, vapor_membrane, internal_render, brickwork, external_surface])
@@ -163,16 +159,17 @@ inside_temp = 18
 wall.compute(inside_temp=inside_temp, outside_temp=outside_temp, inside_rh=start_rh, outside_rh=end_rh)
 
 print(f"Outside temperature: {outside_temp:.1f}°C, Outside relative humidity: {end_rh:.0f}%")
-print("Outside dew point temperature: ", calculate_dew_point(outside_temp, calculate_vapor_pressure(outside_temp, end_rh)))
+print("Outside dew point temperature: ", calculate_dew_point(calculate_vapor_pressure(outside_temp, end_rh)))
 
 wall.display_layers()
 
 # Plot the temperature profile and the dew point temperature profile
 distance = [sum(layer.thickness for layer in wall.layers[:i]) for i in range(len(wall.layers) + 1)]
 temperatures = [layer.start_temperature for layer in wall.layers] + [wall.layers[-1].end_temperature]
-dew_points = [calculate_dew_point(layer.start_temperature, layer.start_vapor_pressure) for layer in wall.layers] + [calculate_dew_point(wall.layers[-1].end_temperature, wall.layers[-1].end_vapor_pressure)]
+dew_points = [calculate_dew_point(layer.start_vapor_pressure) for layer in wall.layers] + [calculate_dew_point(wall.layers[-1].end_vapor_pressure)]
 vapor_pressures = [layer.start_vapor_pressure for layer in wall.layers] + [wall.layers[-1].end_vapor_pressure]
 saturation_vapor_pressures = [calculate_vapor_pressure(layer.start_temperature, 100) for layer in wall.layers] + [calculate_vapor_pressure(wall.layers[-1].end_temperature, 100)]
+
 fig, axs = plt.subplots(1, 2, figsize=(14, 6))
 axs[0].plot(distance, temperatures, label="Temperature (°C)")
 axs[0].plot(distance, dew_points, label="Dew Point (°C)")
